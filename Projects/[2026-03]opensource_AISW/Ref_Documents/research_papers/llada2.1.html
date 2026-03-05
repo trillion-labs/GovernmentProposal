@@ -1,0 +1,2309 @@
+<html>
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+<meta name=Generator content="Microsoft Word 15 (filtered)">
+<title>LLaDA2.1: Speeding Up Text Diffusion via Token Editing</title>
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+	{font-family:Cambria;
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Inconsolata;
+	panose-1:0 0 0 0 0 0 0 0 0 0;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:5.65pt;
+	margin-left:5.8pt;
+	text-align:justify;
+	text-justify:inter-ideograph;
+	text-indent:-.1pt;
+	line-height:94%;
+	font-size:10.0pt;
+	font-family:"Calibri",sans-serif;
+	color:black;}
+h1
+	{mso-style-link:"제목 1 Char";
+	margin-top:0cm;
+	margin-right:.25pt;
+	margin-bottom:2.35pt;
+	margin-left:.5pt;
+	text-indent:-.5pt;
+	line-height:107%;
+	page-break-after:avoid;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:black;}
+h2
+	{mso-style-link:"제목 2 Char";
+	margin-top:0cm;
+	margin-right:9.55pt;
+	margin-bottom:3.95pt;
+	margin-left:.5pt;
+	text-align:center;
+	text-indent:-.5pt;
+	line-height:107%;
+	page-break-after:avoid;
+	font-size:9.0pt;
+	font-family:"Calibri",sans-serif;
+	color:black;}
+span.2Char
+	{mso-style-name:"제목 2 Char";
+	mso-style-link:"제목 2";
+	font-family:"Calibri",sans-serif;
+	color:black;
+	font-weight:bold;}
+span.1Char
+	{mso-style-name:"제목 1 Char";
+	mso-style-link:"제목 1";
+	font-family:"Calibri",sans-serif;
+	color:black;
+	font-weight:bold;}
+.MsoChpDefault
+	{font-size:11.0pt;}
+.MsoPapDefault
+	{margin-bottom:8.0pt;}
+ /* Page Definitions */
+ @page WordSection1
+	{size:612.0pt 792.0pt;
+	margin:58.1pt 69.1pt 68.05pt 69.35pt;}
+div.WordSection1
+	{page:WordSection1;}
+@page WordSection2
+	{size:612.0pt 792.0pt;
+	margin:72.0pt 89.05pt 72.0pt 76.35pt;}
+div.WordSection2
+	{page:WordSection2;}
+@page WordSection3
+	{size:612.0pt 792.0pt;
+	margin:78.5pt 67.4pt 68.05pt 70.45pt;}
+div.WordSection3
+	{page:WordSection3;}
+ /* List Definitions */
+ ol
+	{margin-bottom:0cm;}
+ul
+	{margin-bottom:0cm;}
+-->
+</style>
+
+</head>
+
+<body lang=KO style='word-wrap:break-word'>
+
+<div class=WordSection1>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:17.45pt;margin-left:1.5pt;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'><img
+width=471 height=30 id="Group 31103" src="llada2.1.fld/image001.jpg"></span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:13.55pt;text-align:left;text-indent:0cm;
+line-height:107%'><b><span lang=EN-US style='font-size:17.0pt;line-height:107%'>LLaDA2.1:
+Speeding Up Text Diffusion via Token Editing</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:19.0pt;margin-left:1.5pt;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'><img
+width=471 height=1 id="Group 31105" src="llada2.1.fld/image002.jpg"></span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:.3pt;margin-left:26.65pt;
+text-indent:0cm;line-height:112%'><span lang=EN-US style='font-size:10.0pt;
+line-height:112%'>Tiwei Bie</span><sup><span lang=EN-US style='font-size:10.0pt;
+line-height:112%;font-weight:normal'>1</span></sup><span lang=EN-US
+style='font-size:10.0pt;line-height:112%'>, Maosong Cao</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>, Xiang Cao</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>, Bingsen Chen</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>, Fuyuan Chen</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>, Kun Chen</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>, Lun Du</span><sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%;font-weight:normal'>1</span></sup><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>,</span></h1>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:1.6pt;
+margin-bottom:.2pt;margin-left:3.1pt;text-align:center;text-indent:-.5pt;
+line-height:115%'><b><span lang=EN-US>Daozhuo Feng</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Haibo Feng</span></b><sup><span
+lang=EN-US>1,4</span></sup><b><span lang=EN-US>, Mingliang Gong</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Zhuocheng Gong</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yanmei Gu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Jian Guan</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Kaiyuan Guan</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Hongliang He</span></b><sup><span
+lang=EN-US>1,3</span></sup><b><span lang=EN-US>, Zenan Huang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Juyong Jiang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Zhonghui Jiang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Zhenzhong Lan</span></b><sup><span
+lang=EN-US>1,3,†</span></sup><b><span lang=EN-US>,</span></b></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:2.6pt;
+margin-bottom:.2pt;margin-left:3.1pt;text-align:center;text-indent:-.5pt;
+line-height:115%'><b><span lang=EN-US>Chengxi Li</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Jianguo Li</span></b><sup><span
+lang=EN-US>1,†</span></sup><b><span lang=EN-US>, Zehuan Li</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Huabin Liu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Lin Liu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Guoshan Lu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yuan Lu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yuxin Ma</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Xingyu Mou</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Zhenxuan Pan</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Kaida Qiu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yuji Ren</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Jianfeng Tan</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yiding Tian</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Zian Wang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>,</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:10.1pt;margin-left:14.95pt;text-align:left;text-indent:-.5pt;
+line-height:112%'><b><span lang=EN-US>Lanning Wei</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Tao Wu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Yipeng Xing</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Wentao Ye</span></b><sup><span
+lang=EN-US>1,2</span></sup><b><span lang=EN-US>, Liangyu Zha</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Tianze Zhang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Xiaolu Zhang</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Junbo Zhao</span></b><sup><span
+lang=EN-US>1,2,†</span></sup><b><span lang=EN-US>, Da Zheng</span></b><sup><span
+lang=EN-US>1,†</span></sup><b><span lang=EN-US>, Hao Zhong</span></b><sup><span
+lang=EN-US>1,2</span></sup><b><span lang=EN-US>, Wanli Zhong</span></b><sup><span
+lang=EN-US>1,4</span></sup><b><span lang=EN-US>, Jun Zhou</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Junlin Zhou</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Liwang Zhu</span></b><sup><span
+lang=EN-US>1</span></sup><b><span lang=EN-US>, Muzhi Zhu</span></b><sup><span
+lang=EN-US>1,2</span></sup><b><span lang=EN-US>, Yihong Zhuang</span></b><sup><span
+lang=EN-US>1</span></sup></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:24.75pt;
+margin-left:5.8pt'><sup><span lang=EN-US>1</span></sup><span lang=EN-US>Ant
+Group, <sup>2</sup>Zhejiang University, <sup>3</sup>Westlake University, <sup>4</sup>Southern
+University of Science and Technology</span></p>
+
+<h1 align=center style='margin-top:0cm;margin-right:.25pt;margin-bottom:9.2pt;
+margin-left:0cm;text-align:center;text-indent:0cm'><span lang=EN-US>Abstract</span></h1>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:35.95pt;margin-bottom:
+76.3pt;margin-left:36.8pt'><img width=18 height=348 src=missing.gif><span
+lang=EN-US>While <b>LLaDA2.0 </b>showcased the scaling potential of 100B-level
+block-diffusion models and their inherent parallelization, the delicate
+equilibrium between decoding speed and generation quality has remained an
+elusive frontier. Today, we unveil <b>LLaDA2.1</b>, a paradigm shift designed
+to transcend this trade-off. By seamlessly weaving <b>Token-to-Token (T2T) </b>editing
+into the conventional <b>Mask-to-Token (M2T) </b>scheme, we introduce a joint,
+configurable threshold-decoding scheme. This structural innovation gives rise
+to two distinct personas: the <b><i>SpeedyMode(SMode)</i></b>, which
+audaciously lowers the M2T threshold to bypass traditional constraints while
+relying on T2T to refine the output; and the <b><i>Quality Mode (Q Mode)</i></b>,
+which leans into conservative thresholds to secure superior benchmark
+performances with manageable efficiency degrade. Furthering this evolution,
+underpinned by an expansive context window, we implement the first large-scale <b>Reinforcement
+Learning (RL) </b>framework specifically tailored for dLLMs, anchored by
+specialized techniques for stable gradient estimation. This alignment not only
+sharpens reasoning precision but also elevates instruction-following fidelity,
+bridging the chasm between diffusion dynamics and complex human intent. We
+culminate this work by releasing <b>LLaDA2.1-Mini (16B) </b>and <b>LLaDA2.1-Flash
+(100B)</b>. Across 33 rigorous benchmarks, LLaDA2.1 delivers strong task
+performance and lightning-fast decoding speed. Despite its 100B volume, on
+coding tasks it attains an astounding <b>892 TPS </b>on HumanEval+, <b>801 TPS </b>on
+BigCodeBench, and <b>663 TPS </b>on LiveCodeBench.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><img width=423 height=139 src="llada2.1.fld/image003.jpg"
+align=left hspace=12><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;KEA6Z8JdiSRmhVGZ2OZ5y7ylC+4=&quot;&gt;AAACC3icbVDLSgNBEOyNrxhfUY9eFoPgKeyKRC9CwIvHiOYByRJmJ7PJkJnZZaZXCCGfkKt+iDfx6kf4Hf6Ak2QPJrGgobqqG7orTAQ36HnfTm5jc2t7J79b2Ns/ODwqHp80TJxqyuo0FrFuhcQwwRWrI0fBWolmRIaCNcPh/cxvvjBteKyecZSwQJK+4hGnBK30hHd+t1jyyt4c7jrxM1KCDLVu8afTi2kqmUIqiDFt30swGBONnAo2KXRSwxJCh6TP2pYqIpkJxvNTJ+6FVXpuFGtbCt25+ndjTKQxIxnaSUlwYFa9mfivF8rJcr8itFOMboMxV0mKTNHFJVEqXIzdWTBuj2tGUYwsIVRz+4xLB0QTija+gk3JX81knTSuyn6lXHm8LlW9LK88nME5XIIPN1CFB6hBHSj0YQqv8OZMnXfnw/lcjOacbOcUluB8/QJwN5sn&lt;/latexit</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:20.5pt;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;dyeGZ7RoqIQpPl0wcawuKsO4JOY=&quot;&gt;AAACC3icbVDLSgNBEOz1GeMr6tHLYBA8hd0g0YsQ8OIxonlAsoTZySQZMrO7zPQKYckn5Kof4k28+hF+hz/gJNmDSSxoqK7qhu4KYikMuu63s7G5tb2zm9vL7x8cHh0XTk4bJko043UWyUi3Amq4FCGvo0DJW7HmVAWSN4PR/cxvvnBtRBQ+4zjmvqKDUPQFo2ilJ7wrdwtFt+TOQdaJl5EiZKh1Cz+dXsQSxUNkkhrT9twY/ZRqFEzySb6TGB5TNqID3rY0pIobP52fOiGXVumRfqRthUjm6t+NlCpjxiqwk4ri0Kx6M/FfL1CT5X5FaCfYv/VTEcYJ8pAtLuknkmBEZsGQntCcoRxbQpkW9hnChlRThja+vE3JW81knTTKJa9SqjxeF6tullcOzuECrsCDG6jCA9SgDgwGMIVXeHOmzrvz4XwuRjecbOcMluB8/QJx3Jso&lt;/latexit</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.15pt;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:12.85pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:12.85pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:12.85pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;hIkuvgLXp1qShxwd63T02b/oME4=&quot;&gt;AAACO3icbVC7SgNBFJ31GeMramkzGAVtwq6IWknAxjKCeUA2LLOTGx2c2V1m7oph3e/wa9LqN1jbiZ3YO3kUJnpg4Mw558K9J0ykMOi6b87c/MLi0nJhpbi6tr6xWdrabpg41RzqPJaxboXMgBQR1FGghFaigalQQjO8vxz6zQfQRsTRDfYT6Ch2G4me4AytFJS85NBHeMTMICQmp0/UD1X2mAcZ5kf0gvrI0iAbR6ArMM+DUtmtuCPQv8SbkDKZoBaUvvxuzFMFEXLJjGl7boKdjGkUXEJe9FMDCeP37BbalkZMgelko9NyemCVLu3F2r4I6Uj9PZExZUxfhTapGN6ZWW8o/uuFKp/+zwjtFHvnnUxESYoQ8fEmvVRSjOmwSNoVGjjKviWMa2GPofyOacbR1l20LXmznfwljeOKd1o5vT4pV/cnfRXILtkjh8QjZ6RKrkiN1Aknz2RAXsirM3DenQ/ncxydcyYzO2QKzvcP2Qevmw==&lt;/latexit</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:264.9pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:264.9pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;hIkuvgLXp1qShxwd63T02b/oME4=&quot;&gt;AAACO3icbVC7SgNBFJ31GeMramkzGAVtwq6IWknAxjKCeUA2LLOTGx2c2V1m7oph3e/wa9LqN1jbiZ3YO3kUJnpg4Mw558K9J0ykMOi6b87c/MLi0nJhpbi6tr6xWdrabpg41RzqPJaxboXMgBQR1FGghFaigalQQjO8vxz6zQfQRsTRDfYT6Ch2G4me4AytFJS85NBHeMTMICQmp0/UD1X2mAcZ5kf0gvrI0iAbR6ArMM+DUtmtuCPQv8SbkDKZoBaUvvxuzFMFEXLJjGl7boKdjGkUXEJe9FMDCeP37BbalkZMgelko9NyemCVLu3F2r4I6Uj9PZExZUxfhTapGN6ZWW8o/uuFKp/+zwjtFHvnnUxESYoQ8fEmvVRSjOmwSNoVGjjKviWMa2GPofyOacbR1l20LXmznfwljeOKd1o5vT4pV/cnfRXILtkjh8QjZ6RKrkiN1Aknz2RAXsirM3DenQ/ncxydcyYzO2QKzvcP2Qevmw==&lt;/latexit</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.6pt;margin-left:264.9pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:8.85pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:8.85pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:8.85pt;
+margin-bottom:7.4pt;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;KqkwFa7IGldZ/njWpkoK5Ry1IUM=&quot;&gt;AAACNnicbVBNS8NAEN3Ur1q/qh69BKugICURqZ5E8OJRwarQhLDZTNulu0nYnYgl5k/4a3rVf+HFm3gV/ANuPw5afTDw5r0ZmHlhKrhGx3m1SjOzc/ML5cXK0vLK6lp1feNGJ5li0GSJSNRdSDUIHkMTOQq4SxVQGQq4DXvnQ//2HpTmSXyN/RR8STsxb3NG0UhB9SDd8xAeMNdUQvHohTJ/KIIci/1TD2kW5GMXIo5FEVRrTt0Zwf5L3AmpkQkug+qXFyUskxAjE1Trluuk6OdUIWcCioqXaUgp69EOtAyNzQ3az0dfFfauUSK7nShTMdoj9edGTqXWfRmaSUmxq6e9ofivF8ridz8ltDJsn/g5j9MMIWbjS9qZsDGxhxnaEVfAUPQNoUxx84zNulRRhibpiknJnc7kL7k5rLuNeuPqqHa2M8mrTLbINtkjLjkmZ+SCXJImYeSJDMgzebEG1pv1bn2MR0vWZGeT/IL1+Q0kKK5g&lt;/latexit</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;M3/FsbSsyIZKRnwNWWcLwN2YBnE=&quot;&gt;AAACC3icbVDLTgJBEOzFF+IL9ehlIjHxRHbVoBcTEi8eMYqQwIbMDrMwYWZ3M9NrQgifwFU/xJvx6kf4Hf6AA+xBwEo6qa7qTrorSKQw6LrfTm5tfWNzK79d2Nnd2z8oHh49mzjVjNdZLGPdDKjhUkS8jgIlbyaaUxVI3ggGd1O/8cK1EXH0hMOE+4r2IhEKRtFKj3h72SmW3LI7A1klXkZKkKHWKf60uzFLFY+QSWpMy3MT9EdUo2CSjwvt1PCEsgHt8ZalEVXc+KPZqWNyZpUuCWNtK0IyU/9ujKgyZqgCO6ko9s2yNxX/9QI1XuyXhFaK4Y0/ElGSIo/Y/JIwlQRjMg2GdIXmDOXQEsq0sM8Q1qeaMrTxFWxK3nImq+T5ouxVypWHq1LVzfLKwwmcwjl4cA1VuIca1IFBDybwCm/OxHl3PpzP+WjOyXaOYQHO1y9zgZsp&lt;/latexit</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:38.7pt;margin-left:27.8pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:.25pt;
+margin-bottom:4.8pt;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US>Figure 1: <b>Aggressive parallel drafting</b>,
+backed by retroactive correction, accelerates inference.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:3.0pt;margin-left:1.5pt;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'><img
+width=144 height=1 id="Group 31156" src="llada2.1.fld/image004.jpg"></span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:18.15pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Authors
+are listed in alphabetical order based on last name. † indicates tech-leaders.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>1<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Introduction</span></h1>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Discrete diffusion Large Language Models
+(dLLMs) have emerged as a compelling alternative to autoregressive generation,
+offering the potential for non-monotonic reasoning and parallel decoding.
+However, the standard absorbing-state framework—which enforces a rigid,
+monotonic transition from [MASK] to fixed tokens—faces inherent limitations in
+fidelity. As highlighted by </span><span lang=EN-US style='color:#00007F'>Kang
+et al. </span><span lang=EN-US>(</span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), the independent nature of parallel decoding often amplifies
+token-level inconsistencies. While recent studies have attempted to mitigate
+this via confidence-based remasking (</span><span lang=EN-US style='color:#00007F'>Wang
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025b</span><span
+lang=EN-US>) or by employing external guide models (</span><span lang=EN-US
+style='color:#00007F'>Lee et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>). To bridge the
+gap between efficient parallel generation and high-fidelity reasoning, we align
+with the direction of generalizing discrete diffusion beyond absorbing states (</span><span
+lang=EN-US style='color:#00007F'>Rutte et al.¨      </span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>) and propose a
+comprehensive framework for Editable State Evolution.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>Unlike prior work such as </span><span
+lang=EN-US style='color:#00007F'>Song et al. </span><span lang=EN-US>(</span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>), we first design
+a novel <b>Error-Correcting Editable </b>decoding strategy, which introduces a
+dynamic paradigm controlled by dual probability thresholds. This paradigm
+encompasses two types of operations: direct decoding from mask to token, and
+editing from one token to another. This strategy enables the model to directly
+refine its own outputs during the generation process, thereby effectively
+addressing the local inconsistencies commonly encountered in parallel decoding.
+To cultivate this editing capability, our CPT and SFT phases expose the model
+to both masked positions and stochastic noise, incentivizing it to not only
+generate new content but also identify and rectify existing errors.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><b><span lang=EN-US>Crucially, this architecture transforms
+the rigid trade-off between latency and fidelity into a flexible,
+user-configurable continuum. </span></b><span lang=EN-US>By allowing the model
+to retroactively correct errors, we can aggressively lower the confidence
+threshold for the initial Mask-to-Token (M2T) phase without collapsing the
+generation quality. This insight gives rise to two distinct operating personas:
+a <b><i>Speedy Mode (S Mode)</i></b>, which prioritizes high-throughput
+generation by accepting lower-confidence tokens and relying on subsequent
+Token-to-Token (T2T) passes for rectification; and a <b><i>Quality Mode (Q
+Mode)</i></b>, which adheres to conservative thresholds to maximize reasoning
+rigor. This duality demonstrates that editability is not merely a mechanism for
+error repair, but a fundamental lever for accelerating parallel decoding.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>To further elevate the model’s
+capabilities, we integrate a <b>Reinforcement Learning (RL) </b>stage. While
+recent works such as SPG (</span><span lang=EN-US style='color:#00007F'>Wang et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025a</span><span
+lang=EN-US>), TraceRL (</span><span lang=EN-US style='color:#00007F'>Wang et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025c</span><span
+lang=EN-US>) and ESPO (</span><span lang=EN-US style='color:#00007F'>Ou et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>) have demonstrated the potential of RL in improving dLLMs, applying
+policy gradients to block-autoregressive models remains challenging due to the
+intractability of sequence log-likelihoods. We circumvent this by adopting an
+ELBO-based Block-level Policy Optimization (EBPO) framework tailored for our
+editable setting.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:0cm;
+margin-left:.85pt'><span lang=EN-US>Notice that LLaDA2.1 extends its previous
+version (LLaDA2.0) by prioritizing decoding versatility over mere parameter
+scaling or benchmark peaking. By keeping the model size constant and minimal
+change of training data, we prove that our novel editing scheme enables
+lightning-fast execution with minimal overhead. This work serves as a
+proof-of-concept for a new dLLM paradigm that balances high-quality generation
+with</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:12.8pt;
+margin-left:.85pt'><span lang=EN-US>extreme operational efficiency.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:8.15pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>2<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Configurable Decoding Scheme</span></h1>
+
+<div style='border:solid #CCCCCC 1.5pt;padding:0cm 0cm 0cm 0cm;background:#F9F9F9;
+margin-left:12.65pt;margin-right:11.55pt'>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:0cm;margin-bottom:16.4pt;
+margin-left:0cm;text-indent:.3pt;line-height:91%;background:#F9F9F9;border:
+none;padding:0cm'><span lang=EN-US>During LLM decoding, <b>Exposure Bias</b>—where
+errors compound as the model conditions on its own imperfect predictions—is
+inevitable. This phenomenon is particularly severe in dLLMs due to their
+parallel generation nature. We observe that once such decoding errors occur,
+dLLMs tend to become increasingly conservative in subsequent steps,
+significantly slowing down the generation process. In contrast, autoregressive
+models exhibit lower exposure bias and can self-correct through extended
+chainof-thought reasoning. To address this challenge, we introduce an <b>editing
+</b>operation into the decoding process, enabling the model to retrospectively
+correct errors introduced during parallel generation, thereby achieving a much
+better balance between generation speed and quality.</span></p>
+
+</div>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:.4pt;
+margin-left:.85pt'><span lang=EN-US>Specifically, we extend standard discrete
+diffusion to support it. Unlike conventional absorbing-state models that
+enforce a rigid monotonic transition from [MASK] to fixed tokens, our framework
+introduces a dynamic</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:8.1pt;
+margin-left:.85pt'><span lang=EN-US>“Draft-and-Edit” paradigm controlled by
+dual probability thresholds. We formalize the state evolution by defining two
+active update sets at timestep <i>t</i>: the <i>Unmasking Set </i>Γ<i><sub>t </sub></i>and
+the <i>Editing Set </i>∆<i><sub>t</sub></i>.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>We formalize the state evolution by
+defining two active update sets at timestep <i>t</i>: the <i>Unmasking Set </i>Γ<i><sub>t
+</sub></i>and</span></p>
+
+<p class=MsoNormal align=right style='margin-top:0cm;margin-right:60.35pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:right;text-indent:-.5pt;
+line-height:110%'><img width=470 height=152 src="llada2.1.fld/image005.jpg"
+align=left hspace=12><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&gt;</span></p>
+
+<p class=MsoNormal align=right style='margin-top:0cm;margin-right:60.35pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:right;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>latexit
+sha1_base64=&quot;Wwai5pmSpwdT/cmdClLhTjgRfd4=&quot;&gt;AAACH3icbVDLSsNAFJ34rPUVFVdugkXoqiQi1Y1QcOOygn1AG8NkOm2HTiZh5kYaQz6mW/0Qd+K23+EPOG2zsK0HLpx7zr1w7/EjzhTY9tTY2Nza3tkt7BX3Dw6Pjs2T06YKY0log4Q8lG0fK8qZoA1gwGk7khQHPqctf/Qw81uvVCoWimdIIuoGeCBYnxEMWvLM8/FLOsq8FLL7LtAxpBy/JZlnluyKPYe1TpyclFCOumf+dHshiQMqgHCsVMexI3BTLIERTrNiN1Y0wmSEB7SjqcABVW46Pz+zrrTSs/qh1CXAmqt/N1IcKJUEvp4MMAzVqjcT//X8IFvuV4RODP07N2UiioEKsrikH3MLQmsWltVjkhLgiSaYSKafscgQS0xAR1rUKTmrmayT5nXFqVaqTzelWjnPq4Au0CUqIwfdohp6RHXUQASlaILe0YcxMT6NL+N7Mbph5DtnaAnG9BdkE6Q8&lt;/latexit</span></p>
+
+<p class=MsoNormal align=right style='margin-top:0cm;margin-right:60.35pt;
+margin-bottom:110.7pt;margin-left:.5pt;text-align:right;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:1.0pt;line-height:110%;
+font-family:"Courier New"'>&lt;</span><span lang=EN-US>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:.25pt;
+margin-bottom:21.95pt;margin-left:.5pt;text-align:center;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US>Figure 2: Overview of training &amp;
+inference framework of LLaDA2.1</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:28.0pt;
+margin-left:.85pt'><span lang=EN-US>the <i>Editing Set </i>∆<i><sub>t</sub></i>.
+Let <i>v<sup>i</sup><sub>t </sub></i></span><span lang=EN-US style='font-size:
+10.5pt;line-height:94%;font-family:"Cambria",serif'>= </span><span lang=EN-US>arg
+max<i><sub>v </sub>p<sub>θ</sub></i></span><span lang=EN-US style='font-size:
+10.5pt;line-height:94%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>v</span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+94%;font-family:"Cambria",serif'>|</span><i><span lang=EN-US>x<sub>t</sub></span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:94%;font-family:"Cambria",serif'>)
+</span><span lang=EN-US>be the top-candidate. The update indices are identified
+as:</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:1.0cm;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                  </span><span
+lang=EN-US>Γ</span><i><span lang=EN-US style='font-size:7.5pt;line-height:107%'>t
+</span></i><span lang=EN-US style='font-size:10.5pt;line-height:107%;
+font-family:"Cambria",serif'>= </span><span lang=EN-US style='font-family:"Cambria",serif'>n</span><i><span
+lang=EN-US>i </span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>| </span><i><span lang=EN-US>x</span></i><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>ti </span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>=
+</span><span lang=EN-US>[MASK] and <i>p</i></span><i><span lang=EN-US
+style='font-size:7.5pt;line-height:107%'>θ</span></i><span lang=EN-US
+style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>v</span></i><i><span lang=EN-US style='font-size:7.5pt;line-height:
+107%'>it</span></i><span lang=EN-US style='font-size:10.5pt;line-height:107%;
+font-family:"Cambria",serif'>|</span><i><span lang=EN-US>x</span></i><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>t</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>)
+<i>&gt;</i></span><i><span lang=EN-US>τ</span></i><span lang=EN-US
+style='font-size:7.5pt;line-height:107%'>mask</span><span lang=EN-US
+style='font-family:"Cambria",serif'>o </span><span lang=EN-US>,                                                                     (1)</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:18.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                 </span><span
+lang=EN-US>∆</span><i><span lang=EN-US style='font-size:7.5pt;line-height:107%'>t
+</span></i><span lang=EN-US style='font-size:10.5pt;line-height:107%;
+font-family:"Cambria",serif'>= </span><span lang=EN-US style='font-family:"Cambria",serif'>n</span><i><span
+lang=EN-US>i </span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>| </span><i><span lang=EN-US>x</span></i><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>ti </span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'≯=
+</span><i><span lang=EN-US>v</span></i><i><span lang=EN-US style='font-size:
+7.5pt;line-height:107%'>it </span></i><span lang=EN-US>and <i>p</i></span><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>θ</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>v</span></i><i><span lang=EN-US style='font-size:7.5pt;line-height:
+107%'>it</span></i><span lang=EN-US style='font-size:10.5pt;line-height:107%;
+font-family:"Cambria",serif'>|</span><i><span lang=EN-US>x</span></i><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>t</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>)
+<i>&gt;</i></span><i><span lang=EN-US>τ</span></i><span lang=EN-US
+style='font-size:7.5pt;line-height:107%'>edit</span><span lang=EN-US
+style='font-family:"Cambria",serif'>o </span><span lang=EN-US>,                                                                                    (2)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt;line-height:144%'><span lang=EN-US>with <i>τ</i><sub>mask</sub>,
+<i>τ</i><sub>edit </sub></span><span lang=EN-US style='font-size:10.5pt;
+line-height:144%;font-family:"Cambria",serif'>∈ [</span><span lang=EN-US>0, 1</span><span
+lang=EN-US style='font-size:10.5pt;line-height:144%;font-family:"Cambria",serif'>]
+</span><span lang=EN-US>being the confidence thresholds configuring the
+decoding dynamics. The transition operator then applies the updates strictly on
+the union of these sets:</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:16.45pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                           </span><i><sup><span
+lang=EN-US style='font-size:15.5pt;line-height:107%'>x</span></sup></i><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>ti</span></i><span
+lang=EN-US style='font-size:8.0pt;line-height:107%;font-family:"Cambria",serif'>−</span><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>1 </span><span lang=EN-US><img
+width=17 height=25 id="Picture 35677" src="llada2.1.fld/image006.jpg"></span><i><span
+lang=EN-US>vx<sup>i</sup><sub>tt</sub><sup>i </sup></span></i><span lang=EN-US>ifotherwise.<i>i
+</i></span><span lang=EN-US style='font-size:10.5pt;line-height:107%;
+font-family:"Cambria",serif'>∈ </span><span lang=EN-US>Γ</span><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>t </span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>∪
+</span><span lang=EN-US>∆</span><i><span lang=EN-US style='font-size:7.5pt;
+line-height:107%'>t</span></i><span lang=EN-US>,                                                                        </span><sub><span
+lang=EN-US style='font-size:15.5pt;line-height:107%'>(3)</span></sub></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>3<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Training Paradigm</span></h1>
+
+<h2 align=left style='margin-top:0cm;margin-right:0cm;margin-bottom:2.2pt;
+margin-left:23.15pt;text-align:left;text-indent:-22.4pt;line-height:112%'><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>3.1<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US style='font-size:10.0pt;line-height:112%'>Training
+Alignment for “Draft-and-Edit”</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>To align the model with the “Draft-and-Edit”
+inference paradigm and mitigate the <i>Exposure Bias </i>inherent in standard
+mask-based training, we employ a unified <b>Mixture of M2T and T2T </b>objective.
+This objective is applied throughout both the Continual Pre-Training (CPT) and
+Supervised Finetuning (SFT) stages.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:11.2pt;
+margin-left:.85pt'><span lang=EN-US>This dual-stream training objective enables
+the model to develop two complementary capabilities fundamental to our
+framework:</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:4.45pt;
+margin-left:37.05pt;text-indent:-10.7pt'><span lang=EN-US style='line-height:
+94%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><b><span
+lang=EN-US>Drafting Stream (Mask-to-Token): </span></b><span lang=EN-US>The
+model learns to predict the correct token at each masked position to generate
+initial content, establishing the foundational drafting capability.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:10.2pt;
+margin-left:37.05pt;text-indent:-10.7pt'><span lang=EN-US style='line-height:
+94%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><b><span
+lang=EN-US>Editing Stream (Token-to-Token): </span></b><span lang=EN-US>The
+model learns to recover original tokens from random noise perturbations
+(rectifying errors), equipping it with the ability to identify and rewrite
+artifacts.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.0pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>By consistently applying this dual-stream
+supervision from CPT through SFT, we ensure that LLaDA2.1 is fundamentally
+conditioned to function as both a fast drafter and a precise editor within a
+single parameter space. Additionally, we employ a Multi-turn Forward (MTF) data
+augmentation technique, by exposing the model to a wider variety of editing
+scenarios, enhance the model’s editing capabilities.</span></p>
+
+<h2 align=left style='margin-top:0cm;margin-right:0cm;margin-bottom:2.2pt;
+margin-left:23.15pt;text-align:left;text-indent:-22.4pt;line-height:112%'><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>3.2<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US style='font-size:10.0pt;line-height:112%'>Reinforcement
+Learning Training</span></h2>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>The application of policy gradient methods
+to diffusion models faces a fundamental hurdle: the intractability of the
+sequence-level log-likelihood, log <i>π<sub>θ</sub></i></span><span lang=EN-US
+style='font-size:10.5pt;line-height:94%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>x</span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+94%;font-family:"Cambria",serif'>)</span><span lang=EN-US>, which is essential
+for computing policy updates. While prior works have explored various
+approximations, they have historically struggled with high variance and
+prohibitive computational costs, limiting RL to small-scale experiments (</span><span
+lang=EN-US style='color:#00007F'>Wang et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025c</span><span lang=EN-US>; </span><span
+lang=EN-US style='color:#00007F'>Ou et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>; </span><span
+lang=EN-US style='color:#00007F'>Wang et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025a</span><span lang=EN-US>). We overcome
+this bottleneck by synthesizing <b>ELBO-based Block-level Policy Optimization
+(EBPO) </b>with robust infrastructure optimizations. By utilizing the Evidence
+Lower Bound (ELBO) as a principled proxy for exact likelihood and implementing <b>Vectorized
+Likelihood Estimation </b>(</span><span lang=EN-US style='color:#00007F'>Arriola
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>) to parallelize bound computation, we achieve orders-of-magnitude
+acceleration. This integration allows us to scale dLLMs RL to unprecedented
+context lengths and training magnitudes, establishing a stable and efficient
+pipeline for post-training.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:.75pt;
+margin-left:.85pt'><span lang=EN-US>Formally, we maximize a clipped surrogate
+objective, where the advantage is weighted by the probability ratio <i>ρ</i>:</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:11.4pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                         </span><span
+lang=EN-US>J<sub>EBPO</sub></span><span lang=EN-US style='font-size:10.5pt;
+line-height:107%;font-family:"Cambria",serif'>(</span><i><span lang=EN-US>θ</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>)
+= </span><b><span lang=EN-US>E</span></b><i><span lang=EN-US style='font-size:
+8.0pt;line-height:107%'>x</span></i><span lang=EN-US style='font-size:7.5pt;
+line-height:107%'>,</span><i><span lang=EN-US style='font-size:8.0pt;
+line-height:107%'>y</span></i><span lang=EN-US><img width=74 height=18
+id="Picture 35680" src="llada2.1.fld/image007.jpg"></span><i><span lang=EN-US
+style='font-size:8.0pt;line-height:107%'> </span><sub><span lang=EN-US>π</span></sub></i><i><sub><span
+lang=EN-US style='font-size:8.0pt;line-height:107%'>θ</span></sub></i><span
+lang=EN-US style='font-size:6.0pt;line-height:107%'>old           </span><i><span
+lang=EN-US>x</span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>)</span><i><span lang=EN-US>A</span></i><span
+lang=EN-US>ˆ, clip</span><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>(</span><i><span lang=EN-US>ρ</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>y</span></i><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>|</span><i><span lang=EN-US>x</span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>)</span><span
+lang=EN-US>, 1 </span><span lang=EN-US style='font-size:10.5pt;line-height:
+107%;font-family:"Cambria",serif'>− </span><i><span lang=EN-US>ϵ</span></i><sub><span
+lang=EN-US>low</span></sub><span lang=EN-US>, 1 </span><span lang=EN-US
+style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>+ </span><i><span
+lang=EN-US>ϵ</span></i><sub><span lang=EN-US>high</span></sub><span lang=EN-US
+style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>)</span><span
+lang=EN-US><img width=17 height=18 id="Picture 35681"
+src="llada2.1.fld/image008.jpg"></span><span lang=EN-US> ,                                   (4)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:4.15pt;
+margin-left:.85pt'><span lang=EN-US>where <i>A</i>ˆ is an estimator of the
+advantage function at timestep <i>t</i>, quantifying the relative improvement
+of the chosen action over the average expectation under the current policy. For
+a set of discretized timesteps</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:13.35pt;
+margin-left:.85pt;line-height:138%'><span lang=EN-US style='font-size:10.5pt;
+line-height:138%;font-family:"Cambria",serif'>{</span><i><span lang=EN-US>t<sub>n</sub></span></i><span
+lang=EN-US style='font-size:10.5pt;line-height:138%;font-family:"Cambria",serif'>}</span><i><span
+lang=EN-US style='font-size:7.5pt;line-height:138%'>n</span><sup><span
+lang=EN-US>N</span></sup></i><sub><span lang=EN-US style='font-family:"Cambria",serif'>=</span><span
+lang=EN-US>1 </span></sub><span lang=EN-US>and weights </span><span lang=EN-US
+style='font-size:10.5pt;line-height:138%;font-family:"Cambria",serif'>{</span><i><span
+lang=EN-US>w<sub>n</sub></span></i><span lang=EN-US style='font-size:10.5pt;
+line-height:138%;font-family:"Cambria",serif'>}</span><span lang=EN-US>, we
+construct a composite input <i>z<sub>n </sub></i></span><span lang=EN-US
+style='font-size:10.5pt;line-height:138%;font-family:"Cambria",serif'>= </span><i><span
+lang=EN-US>y<sub>tn </sub></span></i><span lang=EN-US style='font-size:10.5pt;
+line-height:138%;font-family:"Cambria",serif'>⊕ </span><i><span lang=EN-US>y</span></i><sub><span
+lang=EN-US>0 </span></sub><span lang=EN-US>to compute all block-conditional
+probabilities in parallel:</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                               </span><span
+lang=EN-US>log <i>ρ</i></span><span lang=EN-US style='font-size:10.5pt;
+line-height:107%;font-family:"Cambria",serif'>(</span><i><span lang=EN-US>y</span></i><span
+lang=EN-US><img width=124 height=23 id="Picture 35682"
+src="llada2.1.fld/image009.jpg"></span><i><span lang=EN-US>z<sub>n</sub></span></i><span
+lang=EN-US>, <i>x</i>; M</span><sup><span lang=EN-US style='font-size:16.0pt;
+line-height:107%;font-family:"Cambria",serif'>) </span></sup><span lang=EN-US
+style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>− </span><span
+lang=EN-US>log <i>p<sub>θ</sub></i><sub>old</sub></span><span lang=EN-US
+style='font-size:10.5pt;line-height:107%;font-family:"Cambria",serif'>(</span><i><span
+lang=EN-US>y<sup>b </sup></span></i><span lang=EN-US style='font-size:10.5pt;
+line-height:107%;font-family:"Cambria",serif'>| </span><i><span lang=EN-US>z<sub>n</sub></span></i><span
+lang=EN-US>, <i>x</i>; M</span><sup><span lang=EN-US style='font-size:16.0pt;
+line-height:107%;font-family:"Cambria",serif'>)</span></sup><sup><span
+lang=EN-US style='font-size:15.5pt;line-height:107%;font-family:"Cambria",serif'>
+</span></sup><span lang=EN-US>.                                          (5)</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:7.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                              </span><i><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>n</span></i><span
+lang=EN-US style='font-size:8.0pt;line-height:107%;font-family:"Cambria",serif'>=</span><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>1         <i>b</i></span><span
+lang=EN-US style='font-size:8.0pt;line-height:107%;font-family:"Cambria",serif'>=</span><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>1</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:13.25pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Here, M denotes a Block-Causal Mask ensuring
+the <i>b</i>-th block attends only to valid history. By aggregating block-level
+contributions (<img width=21 height=13 id="Picture 35683"
+src="llada2.1.fld/image010.jpg">) within a single forward pass per timestep <i>n</i>,
+we establish a computationally tractable pipeline for scaling reinforcement
+learning to long-context diffusion generation.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>4<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Infrastructure</span></h1>
+
+<h2 align=left style='margin-top:0cm;margin-right:0cm;margin-bottom:2.2pt;
+margin-left:23.15pt;text-align:left;text-indent:-22.4pt;line-height:112%'><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>4.1<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US style='font-size:10.0pt;line-height:112%'>Training
+Infrastructure</span></h2>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:7.45pt;
+margin-left:.85pt'><b><span lang=EN-US>Continued Pre-Training and Supervised
+Fine-Tuning </span></b><span lang=EN-US>For both continued pre-training (CPT)
+and supervised fine-tuning (SFT), we adopt the same training infrastructure as
+LLaDA2.0 (</span><span lang=EN-US style='color:#00007F'>Bie et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), leveraging dFactory (</span><span lang=EN-US style='color:#00007F'>InclusionAI</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), which provides efficient training recipes specifically designed
+for dLLMs, except that we introduce a dedicated optimized implementation for
+the multi-turn forward (MTF) stage.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:8.9pt;
+margin-left:.85pt'><b><span lang=EN-US>RL Training </span></b><span lang=EN-US>To
+enable effective policy optimization for dLLMs, we extend the AReaL framework (</span><span
+lang=EN-US style='color:#00007F'>Fu et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>; </span><span
+lang=EN-US style='color:#00007F'>Mei et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>) by developing
+specialized likelihood estimation and advantage estimation protocols that
+leverage diffusion sampling, explicitly supporting both T2T and M2T modes. This
+workflow is powered by ASystem (</span><span lang=EN-US style='color:#00007F'>Ling
+Team et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>) for distributed orchestration and utilizes a customized version of
+SGLang (</span><span lang=EN-US style='color:#00007F'>Ant Group Team &amp;
+SGLang Team</span><span lang=EN-US>) as the dedicated rollout engine.</span></p>
+
+<h2 align=left style='margin-top:0cm;margin-right:0cm;margin-bottom:2.2pt;
+margin-left:23.15pt;text-align:left;text-indent:-22.4pt;line-height:112%'><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>4.2<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US style='font-size:10.0pt;line-height:112%'>Inference
+Infrastructure</span></h2>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:0cm;
+margin-left:.85pt'><span lang=EN-US>We use a customized version of SGLang (</span><span
+lang=EN-US style='color:#00007F'>Ant Group Team &amp; SGLang Team</span><span
+lang=EN-US>) for inference. To further accelerate the inference speed, we
+integrate Alpha-MoE (</span><span lang=EN-US style='color:#00007F'>Aleph-Alpha</span><span
+lang=EN-US>), a MoE megakernel that combines the two FusedMoE computations into
+one kernel, and adopt per-block FP8 quantization to balance the inference speed
+and model accuracy. To accelerate inference on long-context sequences, we adopt
+block-wise causal masked attention, allowing the KV cache for the entire long
+context to be computed in a single forward pass.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:8.65pt;
+margin-left:.85pt'><span lang=EN-US>We further enable radix caching and
+batching support for block diffusion LLMs in SGLang.</span></p>
+
+<h2 align=left style='margin-top:0cm;margin-right:0cm;margin-bottom:2.2pt;
+margin-left:23.15pt;text-align:left;text-indent:-22.4pt;line-height:112%'><span
+lang=EN-US style='font-size:10.0pt;line-height:112%'>4.3<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US style='font-size:10.0pt;line-height:112%'>Decoding
+Algorithm at Inference</span></h2>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>In the inference stage, we adopt a decoding
+algorithm that combines Threshold Decoding (</span><span lang=EN-US
+style='color:#00007F'>Ma et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>) with an explicit
+editing mechanism. In the basic setting, decoding and editing are performed
+within a single block: tokens are generated under a threshold-based constraint,
+and local edits are applied to revise intermediate outputs before the block is
+finalized.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:13.15pt;
+margin-left:.85pt'><span lang=EN-US>Beyond single-block editing, we further
+introduce a <b>Multiple Block Editing (MBE) </b>mechanism. MBE allows the model
+to revisit and revise previously generated blocks based on the content of newly
+decoded blocks.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>5<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Evaluation</span></h1>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:11.5pt;
+margin-left:.85pt'><span lang=EN-US>To comprehensively evaluate the quality of
+instruction-tuned models, we employ a diverse suite of benchmarks categorized
+into five dimensions:</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.0pt;margin-bottom:4.0pt;
+margin-left:37.35pt;text-indent:-11.0pt;line-height:98%'><span lang=EN-US
+style='line-height:98%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;
+</span></span><b><span lang=EN-US>Knowledge</span></b><span lang=EN-US>:
+MMLU-Pro (</span><span lang=EN-US style='color:#00007F'>Wang et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), GPQA-Diamond (</span><span lang=EN-US style='color:#00007F'>Rein
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), C-Eval (</span><span lang=EN-US style='color:#00007F'>Huang et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), PHYBench (</span><span lang=EN-US style='color:#00007F'>Qiu et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), TriviaQA (</span><span lang=EN-US style='color:#00007F'>Joshi et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2017</span><span
+lang=EN-US>)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.0pt;margin-bottom:0cm;
+margin-left:37.35pt;text-indent:-11.0pt;line-height:107%'><span lang=EN-US
+style='line-height:107%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;
+</span></span><b><span lang=EN-US>Reasoning</span></b><span lang=EN-US>: SQuAD
+2.0 (</span><span lang=EN-US style='color:#00007F'>Rajpurkar et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2018</span><span
+lang=EN-US>), DROP (</span><span lang=EN-US style='color:#00007F'>Dua et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2019</span><span
+lang=EN-US>), KOR-Bench (</span><span lang=EN-US style='color:#00007F'>Ma et
+al.</span><span lang=EN-US>,</span></p>
+
+<p class=MsoNormal align=right style='margin-top:0cm;margin-right:1.0pt;
+margin-bottom:.15pt;margin-left:.5pt;text-align:right;text-indent:-.5pt;
+line-height:107%'><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), HellaSwag (</span><span lang=EN-US style='color:#00007F'>Zellers
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2019</span><span
+lang=EN-US>), BIG-Bench Hard (</span><span lang=EN-US style='color:#00007F'>Suzgun
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), BIG-Bench Extra Hard</span></p>
+
+<p class=MsoNormal align=right style='margin-top:0cm;margin-right:.7pt;
+margin-bottom:0cm;margin-left:.5pt;text-align:right;text-indent:-.5pt;
+line-height:107%'><span lang=EN-US>(</span><span lang=EN-US style='color:#00007F'>Kazemi
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), MuSR (</span><span lang=EN-US style='color:#00007F'>Sprague et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), ZebraLogic (</span><span lang=EN-US style='color:#00007F'>Lin et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2025</span><span
+lang=EN-US>), PrOntoQA (</span><span lang=EN-US style='color:#00007F'>Saparov</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.0pt;margin-left:36.45pt;text-align:left;text-indent:-.15pt;
+line-height:98%'><span lang=EN-US style='color:#00007F'>&amp; He</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2022</span><span
+lang=EN-US>), PIQA (</span><span lang=EN-US style='color:#00007F'>Bisk et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2020</span><span
+lang=EN-US>), OCNLI (</span><span lang=EN-US style='color:#00007F'>Hu et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2020</span><span
+lang=EN-US>), BIG-Bench Hard-CN (</span><span lang=EN-US style='color:#00007F'>Opencompass
+Team</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.0pt;margin-bottom:.15pt;
+margin-left:37.35pt;text-indent:-11.0pt;line-height:107%'><span lang=EN-US
+style='line-height:107%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;
+</span></span><b><span lang=EN-US>Coding</span></b><span lang=EN-US>: CRUXEval
+(</span><span lang=EN-US style='color:#00007F'>Gu et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), MultiPL-E (</span><span lang=EN-US style='color:#00007F'>Cassano
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), BigCodeBench (</span><span lang=EN-US style='color:#00007F'>Zhuo
+et al.</span><span lang=EN-US>,</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.0pt;margin-left:36.45pt;text-align:left;text-indent:-.15pt;
+line-height:98%'><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), LiveCodeBench (</span><span lang=EN-US style='color:#00007F'>Jain
+et al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2024</span><span
+lang=EN-US>), Spider (</span><span lang=EN-US style='color:#00007F'>Yu et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2018</span><span
+lang=EN-US>), BIRD (</span><span lang=EN-US style='color:#00007F'>Li et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), HumanEval+ (</span><span lang=EN-US style='color:#00007F'>Liu et
+al.</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>), MBPP+ (</span><span lang=EN-US style='color:#00007F'>Liu et al.</span><span
+lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.0pt;margin-bottom:4.4pt;
+margin-left:37.35pt;text-indent:-11.0pt'><span lang=EN-US style='line-height:
+94%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><b><span
+lang=EN-US>Math</span></b><span lang=EN-US>: OlympiadBench (</span><span
+lang=EN-US style='color:#00007F'>He et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2024</span><span lang=EN-US>), AIME 2025 (</span><span
+lang=EN-US style='color:#00007F'>AIME</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>), Omni-MATH (</span><span
+lang=EN-US style='color:#00007F'>Gao et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2024</span><span lang=EN-US>), GSM-Plus (</span><span
+lang=EN-US style='color:#00007F'>Li et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2024</span><span lang=EN-US>), CMATH (</span><span
+lang=EN-US style='color:#00007F'>Wei et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2023</span><span lang=EN-US>)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.0pt;margin-bottom:10.35pt;
+margin-left:37.35pt;text-indent:-11.0pt'><span lang=EN-US style='line-height:
+94%'>•<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><b><span
+lang=EN-US>Agent &amp; Alignment</span></b><span lang=EN-US>: BFCL (</span><span
+lang=EN-US style='color:#00007F'>Patil et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2025</span><span lang=EN-US>), IFEval (</span><span
+lang=EN-US style='color:#00007F'>Zhou et al.</span><span lang=EN-US>, </span><span
+lang=EN-US style='color:#00007F'>2023</span><span lang=EN-US>), Nexus Function
+Calling Benchmark (</span><span lang=EN-US style='color:#00007F'>Nexusflow.ai
+Team</span><span lang=EN-US>, </span><span lang=EN-US style='color:#00007F'>2023</span><span
+lang=EN-US>)</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>We report the comparative scores and TPF
+(tokens per forward) of LLaDA2.1-flash and LLaDA2.1-mini against other models
+in Tables </span><span lang=EN-US style='color:#00007F'>1 </span><span
+lang=EN-US>and </span><span lang=EN-US style='color:#00007F'>2</span><span
+lang=EN-US>, respectively. From the results, we observe that LLaDA2.1’s scores
+under <i>S Mode </i>decrease compared to LLaDA2.0, but a substantial
+improvement in TPF is achieved. While under <i>Q Mode</i>, LLaDA2.1 surpasses
+the results of LLaDA2.0 on both mini and flash model.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:18.6pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>In Table </span><span lang=EN-US
+style='color:#00007F'>3</span><span lang=EN-US>, we focus on showcasing the
+speed performance of LLaDA2.1 in <i>S Mode</i>. It can be observed that
+LLaDA2.1 exhibits significant speed variations across different domains, being
+highest in the code domain and lowest in instruction following. Specifically,
+after quantization, LLaDA2.1-flash achieves a peak TPS of 891.74 on HumanEval+,
+while LLaDA2.1-mini reaches 1586.93 in peak TPS, demonstrating significant
+speed advantages.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:21.75pt;margin-left:32.45pt;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'><img
+width=407 height=161 src=missing.gif></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:13.0pt;
+margin-left:.85pt'><span lang=EN-US>Figure 3: Throughput (TPS) comparison on
+nine benchmarks, consistent with the evaluation settings in Table </span><span
+lang=EN-US style='color:#00007F'>3</span><span lang=EN-US>, for LLaDA2.1
+variants against LLaDA2.0, Ling, and Qwen3 across the mini (left) and flash
+(right) series.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><span lang=EN-US>As shown in Table </span><span lang=EN-US
+style='color:#00007F'>4</span><span lang=EN-US>, under the same <i>S Mode </i>setting,
+Multi-Block Editing (MBE) yields consistent performance improvements across
+benchmarks for both Flash and Mini variants, at the cost of a modest reduction
+in throughput. The gains are particularly evident on reasoning and coding
+tasks, indicating that iterative cross-block refinement effectively corrects
+local errors and improves global consistency without substantially compromising
+decoding efficiency.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:13.15pt;
+margin-left:.85pt'><span lang=EN-US>Figure </span><span lang=EN-US
+style='color:#00007F'>3 </span><span lang=EN-US>further illustrates the
+throughput (in terms of token per sec) comparison of LLaDA 2.1 variants against
+LLaDA 2.0, Ling, and Qwen-3 across 5 different benchmark domains as shown in
+Table </span><span lang=EN-US style='color:#00007F'>3</span><span lang=EN-US>.
+This comparison spotlights LLaDA-2.1 (S Mode)’s striking speed advantage: it
+achieves dramatically faster inference while sacrificing only a negligible
+sliver of output quality.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+18.7pt;text-indent:-17.95pt'><span lang=EN-US>6<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span><span lang=EN-US>Outlook and Limitation</span></h1>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:.85pt'><b><span lang=EN-US>Tradeoff Between Inference Speed and
+Accuracy </span></b><span lang=EN-US>While LLaDA2.1 significantly improves
+inference speed, a clear speed-accuracy tradeoff persists, particularly with
+noticeable performance differences across various Table 1: Benchmark
+Performance of LLaDA2.1-flash, comparing with several baseline models. For
+diffusion language model, we report its scores across each benchmark along with
+its TPF (tokens per forward); for AR model, we report its scores only, as its
+TPF is inherently equal to 1.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.2pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                      </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>Qwen3-30B-          Ling-flash-2.0          LLaDA2.0-flash           LLaDA2.1-flash           LLaDA2.1-flash</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.2pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                     </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>A3B-Inst-2507                                                                                       (S
+Mode)                     (Q Mode)</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.25pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><b><span lang=EN-US style='font-size:9.0pt;line-height:107%'>Benchmark                                            </span></b><span
+lang=EN-US style='font-size:6.5pt;line-height:107%'>(Score)                         (Score)                        (Score
+</span><span lang=EN-US style='font-size:6.5pt;line-height:107%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:6.5pt;line-height:
+107%'>TPF)                      (Score </span><span lang=EN-US
+style='font-size:6.5pt;line-height:107%;font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:6.5pt;line-height:107%'>TPF)                      (Score
+</span><span lang=EN-US style='font-size:6.5pt;line-height:107%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:6.5pt;line-height:
+107%'>TPF)</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><b><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Average                                                 </span></b><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>73.09                        71.52                     72.43
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>3.08                 72.34 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>5.93                 73.54 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>3.64</span></p>
+
+<h2 style='margin-top:0cm;margin-right:2.55pt;margin-bottom:14.2pt;margin-left:
+.5pt;text-indent:0cm'><span lang=EN-US>Knowledge</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:19.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>MMLU-ProGPQA                            74.2154.14              69.1677.55      62.3174.79
+</span><sup><span lang=EN-US style='font-size:14.5pt;line-height:110%;
+font-family:"Cambria",serif'>| </span></sup><span lang=EN-US style='font-size:
+9.0pt;line-height:110%'>3.292.36  66.6775.31</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:14.0pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>C-EVAL                                              88.1229.84              87.5427.67          85.21
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>|| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>1.902.70      86.9326.04</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>PHYBenchTriviaQA                              65.61                                                       30.06
+</span><sup><span lang=EN-US style='font-size:14.5pt;line-height:110%;
+font-family:"Cambria",serif'>| </span></sup><span lang=EN-US style='font-size:
+9.0pt;line-height:110%'>1.94                72.55</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.7pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                                  </span><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>69.76                    66.88
+</span><span lang=EN-US style='font-size:9.5pt;line-height:107%;font-family:
+"Cambria",serif'>|</span></p>
+
+<h2 style='margin-right:2.55pt;text-indent:0cm'><span lang=EN-US>Reasoning</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:28.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>BIG-Bench
+Hard                                   85.54                        89.36                     86.75
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>2.66                 87.82 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>5.61                 88.69 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>3.28</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:6.75pt;text-align:left;text-indent:-.5pt;
+line-height:415%'><span lang=EN-US style='font-size:9.0pt;line-height:415%'>BIG-Bench
+Extra HardMuSRZebraLogic       37.8079.15                    23.2482.72                    27.8680.4882.30
+</span><span lang=EN-US style='font-size:9.5pt;line-height:415%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+415%'>4.603.21          33.5182.55 </span><span lang=EN-US style='font-size:
+9.5pt;line-height:415%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:415%'>2.905.045.78           35.7779.8486.23
+</span><span lang=EN-US style='font-size:9.5pt;line-height:415%;font-family:
+"Cambria",serif'>||| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+415%'>3.263.773.171.85 bbh-zhPrOntoQA      86.18          75.09          87.5296.50
+</span><span lang=EN-US style='font-size:9.5pt;line-height:415%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+415%'>1.70        80.10 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:415%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:415%'>5.80                  88.90 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:415%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:415%'>5.73</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.25pt;margin-left:90.4pt;text-align:center;text-indent:-.5pt;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%;
+font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.95pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                           </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>90.97                        87.60                            </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>2.742.64       84.2095.00
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>|| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>9.23           97.00 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:20.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                           </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>97.12                        97.88                                </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:13.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>PIQA                                                  91.5771.59                   91.95            92.7671.63
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>1.431.09 72.1792.44 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>2.381.832.31 92.1772.7585.31 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|||
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>1.321.511.442.77</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:12.6pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>OCNLI                                                                                       65.36                                </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:7.8pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>HellaSwag                                              86.31                        81.59                 84.97
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>1.263.44       62.8085.60 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>4.97           65.12 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:12.6pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>KOR-Bench                                            69.20                        69.44                    63.04
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.0pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>DROP                                                      87.57                        88.32                 87.90
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>2.263.10   90.6587.55 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>5.405.01 87.8690.80 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>||
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>2.533.90</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.7pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>SQuAD 2.0                                             89.51                        81.32                    90.00
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>|</span></p>
+
+<h2 style='margin-right:2.55pt;text-indent:0cm'><span lang=EN-US>Coding</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:35.75pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>LiveCodeBench                                    46.42                        52.48                     42.51
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>4.23                 44.05 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>6.48                 45.37 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>3.80</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:6.75pt;text-align:left;text-indent:-.5pt;
+line-height:533%'><span style='position:relative;z-index:-1895822336'><span
+style='left:0px;position:absolute;left:-8px;top:-1634px;width:469px;height:
+484px'><img width=469 height=484 src=missing.gif></span></span><span
+lang=EN-US style='font-size:9.0pt;line-height:533%'>MBPP+ 78.21 79.37 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:533%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:533%'>6.45 89.63 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:533%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:533%'>7.77 73.34 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:533%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:533%'>4.70 BIRD-SQL
+47.75 47.49 45.76 </span><span lang=EN-US style='font-size:9.5pt;line-height:
+533%;font-family:"Cambria",serif'>| </span><span lang=EN-US style='font-size:
+9.0pt;line-height:533%'>2.16 42.18 </span><span lang=EN-US style='font-size:
+9.5pt;line-height:533%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:533%'>5.09 44.04 </span><span lang=EN-US
+style='font-size:9.5pt;line-height:533%;font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.0pt;line-height:533%'>2.95</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:31.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>CRUXEval-OMultiPL-EHumanEval+BigCodeBench-Full 86.7541.4970.6787.88 82.7580.8965.7687.5840.70 85.1241.5874.8788.41
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>||| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>3.214.023.333.14                             76.7270.8937.1185.25</span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|</span><sup><span
+lang=EN-US style='font-size:14.5pt;line-height:110%;font-family:"Cambria",serif'>|</span></sup><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|</span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>10.4313.818.516.54 87.5039.2177.2589.63
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>||| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>3.804.339.185.96</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:90.4pt;text-align:center;text-indent:-.5pt;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%;
+font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.6pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Spider                                                     81.79                        80.58                     82.49
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>4.42                 79.18 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>8.74                 81.04 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>5.70</span></p>
+
+<h2 style='margin-right:2.55pt;text-indent:0cm'><span lang=EN-US>Math</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:6.75pt;text-align:left;text-indent:-.5pt;
+line-height:305%'><span lang=EN-US style='font-size:9.0pt;line-height:305%'>AIME
+2025                 61.88          55.89          60.00 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:305%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:305%'>4.57                  63.33
+</span><span lang=EN-US style='font-size:9.5pt;line-height:305%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+305%'>5.36                  63.33 </span><span lang=EN-US style='font-size:
+9.5pt;line-height:305%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:305%'>3.46 OlympiadBenchGSM-PlusCMATH                 77.5989.41                    89.7176.19                 74.0789.7496.90
+</span><span lang=EN-US style='font-size:9.5pt;line-height:305%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+305%'>3.702.68          75.8589.23 </span><span lang=EN-US style='font-size:
+9.5pt;line-height:305%;font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:305%'>7.144.846.46           96.6376.5989.69
+</span><span lang=EN-US style='font-size:9.5pt;line-height:305%;font-family:
+"Cambria",serif'>||| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+305%'>3.832.653.81</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:0cm;
+margin-bottom:0cm;margin-left:90.4pt;text-align:center;text-indent:-.5pt;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%;
+font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.4pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                           </span><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>96.58                        96.52                                </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:107%'>2.17                96.54
+</span><span lang=EN-US style='font-size:9.5pt;line-height:107%;font-family:
+"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Omni-MATH                                          54.00                        53.00                     50.30
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>3.39                 52.30 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>6.01                 54.10 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>3.50</span></p>
+
+<h2 style='margin-right:2.55pt;text-indent:0cm'><span lang=EN-US>Agent &amp;
+Alignment</span></h2>
+
+</div>
+
+<span lang=EN-US style='font-size:10.0pt;line-height:94%;font-family:"Calibri",sans-serif;
+color:black'><br clear=all style='page-break-before:auto'>
+</span>
+
+<div class=WordSection2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>IFEval-strict-prompt                         83.73                        81.15</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>BFCL v3                                               73.41                        67.69</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Nexus FC                                            49.93                        36.25</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:21.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>82.62
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>1.474.87 83.3674.86 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>||</span><span lang=EN-US
+style='font-size:9.0pt;line-height:110%'>11.292.249.24 83.5575.6147.65 </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|||
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>1.416.767.38</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:2.75pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>74.94
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>5.53               44.83 </span><span lang=EN-US style='font-size:9.5pt;
+line-height:110%;font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:.5pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>50.45
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>|</span></p>
+
+</div>
+
+<span lang=EN-US style='font-size:10.0pt;line-height:94%;font-family:"Calibri",sans-serif;
+color:black'><br clear=all style='page-break-before:auto'>
+</span>
+
+<div class=WordSection3>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Table 2: Benchmark Performance of
+LLaDA2.0-mini, comparing with several baseline models. For diffusion language
+model, we report its scores across each benchmark along with its TPF (tokens
+per forward); for AR model, we report its scores only, as its TPF is inherently
+equal to 1.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.05pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                      </span><b><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>Qwen3-8B         Ling-mini-2.0           LLaDA2.0-mini           LLaDA2.1-mini           LLaDA2.1-mini</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.05pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                      </span><b><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>(no think)                                                                                          (S
+Mode)                     (Q Mode)</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><b><span lang=EN-US style='font-size:9.5pt;line-height:107%'>Benchmark                                        </span></b><span
+lang=EN-US style='font-size:7.5pt;line-height:107%'>(Score)                      (Score)                       (Score
+</span><span lang=EN-US style='font-size:7.5pt;line-height:107%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:7.5pt;line-height:
+107%'>TPF)                     (Score </span><span lang=EN-US style='font-size:
+7.5pt;line-height:107%;font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:7.5pt;line-height:107%'>TPF)                     (Score </span><span
+lang=EN-US style='font-size:7.5pt;line-height:107%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:7.5pt;line-height:107%'>TPF)</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><b><span lang=EN-US style='font-size:9.5pt;line-height:107%'>Average                                              </span></b><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>61.59                      64.72                     63.39
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.60                 62.07 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>5.34                 63.90 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>3.12</span></p>
+
+<h2 style='margin-top:0cm;margin-right:3.05pt;margin-bottom:20.5pt;margin-left:
+0cm;text-indent:0cm;line-height:110%'><span lang=EN-US style='font-size:9.5pt;
+line-height:110%'>Knowledge</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:38.8pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>GPQA                                                   48.01                      59.41                47.76
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.732.15 48.3663.42 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>3.623.394.22 53.2878.5964.84 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>||| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.412.522.121.91</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:27.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>MMLU-Pro                                         65.83                      67.18                     64.27
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.78                 78.40 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.41                 13.05 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.02</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:6.4pt;text-align:left;text-indent:-.5pt;
+line-height:207%'><span lang=EN-US style='font-size:9.5pt;line-height:207%'>C-EVAL
+80.60 82.17 81.80 </span><span lang=EN-US style='font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.5pt;line-height:207%'>2.48 12.75 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:207%'>3.21 54.24 </span><span lang=EN-US
+style='font-family:"Cambria",serif'>| </span><span lang=EN-US style='font-size:
+9.5pt;line-height:207%'>PHYBench 9.76 14.59 11.70</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>TriviaQA                                              52.51                      55.63                     51.33
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.54                 53.33 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<h2 style='margin-top:0cm;margin-right:3.05pt;margin-bottom:23.55pt;margin-left:
+0cm;text-indent:0cm;line-height:110%'><span lang=EN-US style='font-size:9.5pt;
+line-height:110%'>Reasoning</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:34.35pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>BIG-Bench
+Hard                                79.48                      83.70     78.2175.7571.48
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.362.03 78.4215.30 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>5.023.193.89    70.4080.5815.78 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>||| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.351.661.562.86</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:6.4pt;text-align:left;text-indent:-.5pt;
+line-height:409%'><span lang=EN-US style='font-size:9.5pt;line-height:409%'>BIG-Bench
+Extra Hard 18.27 14.81 16.47 </span><span lang=EN-US style='font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.5pt;line-height:409%'>2.77 67.65 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:409%'>2.48 71.89 </span><span lang=EN-US
+style='font-family:"Cambria",serif'>| </span><span lang=EN-US style='font-size:
+9.5pt;line-height:409%'>2.93 bbh-zh 80.09 66.11 </span><span lang=EN-US
+style='font-family:"Cambria",serif'>| </span><span lang=EN-US style='font-size:
+9.5pt;line-height:409%'>1.45 70.43 </span><span lang=EN-US style='font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.5pt;line-height:
+409%'>5.38 77.10 </span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:409%'>2.73</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:15.6pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>MuSR                                                   70.02                      71.36</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:32.1pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>ZebraLogic                                          37.48                      79.85                 64.20
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.302.36  68.5087.50 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.862.59 86.8984.50 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>1.451.23</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:35.75pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>PrOntoQA                                           93.12                      96.06                     86.00
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.45                 84.87 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>1.78                 61.59 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>1.49</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:36.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>PIQA                                                     88.30                      87.54                86.5149.92
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>4.06           61.02 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.39                 76.19 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.35</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:35.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>OCNLI                                                  61.49                      60.17           64.5181.91
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.502.47      75.71 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.28                 48.00 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.87</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:1.0cm;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>HellaSwag                                          79.56                      69.02               79.0186.50
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.45          46.64 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>5.84                 82.37 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>3.09</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:10.25pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>KOR-Bench                                         54.96                      63.20                                 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.02                 81.55 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.33                 85.13 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>DROP                                                   84.56                      78.80</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.75pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>SQuAD
+2.0                                          85.21                      75.56                                                             84.51
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<h2 style='margin-top:0cm;margin-right:3.05pt;margin-bottom:18.7pt;margin-left:
+0cm;text-indent:0cm;line-height:110%'><span lang=EN-US style='font-size:9.5pt;
+line-height:110%'>Coding</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:40.05pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>LiveCodeBench                                 26.76                      42.29                 31.83
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>3.342.78 28.8570.62 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>||</span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>10.596.425.85 74.0730.4073.75 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>||| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>3.633.357.776.30</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:31.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>CRUXEval-O                                       74.06                      76.12               71.6267.46
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>3.43         73.28 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>12.32               82.93 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.01</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:21.8pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>MBPP+                                                72.69                      77.25                     78.24
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>5.16                80.49 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>7.23                 67.17 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.09</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:13.1pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>MultiPL-E                                            61.70                      67.09</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:40.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span style='position:relative;z-index:-1895821312'><span
+style='position:absolute;left:-10px;top:-2122px;width:471px;height:502px'><img
+width=471 height=502 src="llada2.1.fld/image011.jpg"></span></span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>HumanEval+                                      79.50                      80.03           81.4039.34
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.783.93 64.1675.78 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>7.33          34.39 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>2.42</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:8.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>BigCodeBench-Full                          36.05                      35.00           32.8976.76
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.871.96 30.1837.32 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.487.98 38.4077.55 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>5.48</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>BIRD-SQL                                            36.11                      39.67</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:3.3pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>Spider                                                  72.80                      76.43</span></p>
+
+<h2 style='margin-top:0cm;margin-right:3.05pt;margin-bottom:29.65pt;margin-left:
+0cm;text-indent:0cm;line-height:110%'><span lang=EN-US style='font-size:9.5pt;
+line-height:110%'>Math</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:38.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>AIME
+2025                                         22.08                      47.66      36.6795.72
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.412.632.57 36.6764.3041.70
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>6.347.086.82              43.3366.6786.55
+</span><span lang=EN-US style='font-family:"Cambria",serif'>||| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.563.993.293.69</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:28.0pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>OlympiadBench                                55.33                      72.30               67.7041.70
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>2.41          85.88 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>4.94                 94.99 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>3.56</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:11.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>GSM-Plus                                            85.56                      87.18                     86.50
+</span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.98                 95.63 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>| </span><span lang=EN-US
+style='font-size:9.5pt;line-height:107%'>6.41                 43.60 </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>CMATH                                                95.42                      96.40</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:9.75pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>Omni-MATH                                       33.20                      48.80                                                                        </span><span
+lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<h2 style='margin-top:0cm;margin-right:3.05pt;margin-bottom:17.2pt;margin-left:
+0cm;text-indent:0cm;line-height:110%'><span lang=EN-US style='font-size:9.5pt;
+line-height:110%'>Agent &amp; Alignment</span></h2>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:13.5pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>IFEval-strict-prompt                        84.29                      76.16                 80.78
+</span><sup><span lang=EN-US style='font-size:15.0pt;line-height:107%;
+font-family:"Cambria",serif'>| </span></sup><span lang=EN-US style='font-size:
+9.5pt;line-height:107%'>1.244.26 81.3372.06 </span><sup><span lang=EN-US
+style='font-size:15.0pt;line-height:107%;font-family:"Cambria",serif'>|| </span></sup><span
+lang=EN-US style='font-size:9.5pt;line-height:107%'>1.837.398.27 83.1873.6133.69
+</span><sup><span lang=EN-US style='font-size:15.0pt;line-height:107%;
+font-family:"Cambria",serif'>|</span></sup><span lang=EN-US style='font-family:
+"Cambria",serif'>|</span><sup><span lang=EN-US style='font-size:15.0pt;
+line-height:107%;font-family:"Cambria",serif'>|</span></sup><span lang=EN-US
+style='font-family:"Cambria",serif'> </span><span lang=EN-US style='font-size:
+9.5pt;line-height:107%'>5.144.911.25</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:2.7pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>BFCL v3                                               70.12                      53.75                     70.72
+</span><sub><span lang=EN-US style='font-size:15.0pt;line-height:107%;
+font-family:"Cambria",serif'>| </span></sub><span lang=EN-US style='font-size:
+9.5pt;line-height:107%'>4.06                 31.59 </span><span lang=EN-US
+style='font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:9.5pt;line-height:107%'>Nexus FC                                             37.71                      34.38                     35.18
+</span><span lang=EN-US style='font-family:"Cambria",serif'>|</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:12.2pt;margin-left:.95pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Table 3: Throughput (TPS) and relative score
+changes of Flash and Mini variants across benchmarks. For each model family,
+the w/o Quant setting serves as the baseline. Cells under w/ Quant are
+vertically split into <i>TPS </i></span><span lang=EN-US style='font-size:10.5pt;
+line-height:93%;font-family:"Cambria",serif'>| </span><span lang=EN-US>∆<i>Score</i>.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:3.9pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                 </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>Category           Benchmark                                   LLaDA2.1-flash                                  LLaDA2.1-mini</span></b></p>
+
+<p class=MsoNormal align=left style='margin:0cm;text-align:left;text-indent:
+0cm;line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:
+107%'>                                                               </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>w/o Quant            w/
+Quant           w/o Quant           w/ Quant</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:10.3pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                                                   </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>TPS                TPS </span><span
+lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:"Cambria",serif'>|
+</span><span lang=EN-US style='font-size:9.0pt;line-height:110%'>∆Score                TPS                TPS
+</span><span lang=EN-US style='font-size:9.5pt;line-height:110%;font-family:
+"Cambria",serif'>| </span><span lang=EN-US style='font-size:9.0pt;line-height:
+110%'>∆Score</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                   </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>HumanEval+                       746.66        891.74      -3.04            1496.67       1586.93   -0.61</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                  </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>MBPP+                                 639.47        761.38      -1.85            1286.96       1303.96    +1.85</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span style='position:relative;z-index:-1895820288'><span
+style='position:absolute;left:34px;top:-2029px;width:382px;height:169px'><img
+width=382 height=169 src="llada2.1.fld/image012.jpg"></span></span><span
+lang=EN-US style='font-size:11.0pt;line-height:110%'>                 </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Coding                CRUXEval-O                       550.09        645.72      -0.24             980.82        1063.94   -1.00</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                   </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>BigCodeBench-Full           691.14        801.48      +1.06           1220.40       1307.45   -0.09</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.6pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                   </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>LiveCodeBench                  571.60        663.39      -1.76            1015.82       1102.92    +1.98</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.6pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Math                  GSM-Plus                             574.65        667.07      -0.03            1080.51       1186.18   -0.30</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:3.2pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                 </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Knowledge        GPQA-Diamond                416.92        477.79      -0.64             724.30         784.62     -1.64</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:48.25pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Instruction</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                   </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>IFEval                                    219.37        248.25      +1.48            338.58         365.52     -1.29</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.25pt;margin-left:48.25pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Following</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:13.35pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                 </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Reasoning         PrOntoQA                           770.88        912.16      -1.00             880.19         938.93     -1.50</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:12.2pt;
+margin-left:.85pt'><span lang=EN-US>Table 4: Performance comparison of
+LLaDA2.1-flash and Mini variants with and without Multi-Block Editing (MBE)
+across benchmarks. Each cell reports <i>Score </i></span><span lang=EN-US
+style='font-size:10.5pt;line-height:94%;font-family:"Cambria",serif'>| </span><i><span
+lang=EN-US>TPF</span></i><span lang=EN-US>.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:3.9pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>       </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>Category                           Benchmark                                        LLaDA2.1-flash                                       LLaDA2.1-mini</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.2pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                                     </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>w/o MBE                 w/
+MBE                 w/o MBE                 w/ MBE</span></b></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.55pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US style='font-size:11.0pt;line-height:107%'>                                                                 </span><span
+lang=EN-US style='font-size:9.0pt;line-height:107%'>Score      TPF           Score      TPF           Score      TPF           Score      TPF</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                    </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>MMLU-Pro                       75.31      4.43          75.90     3.88          63.42     4.22          63.10      3.66</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:19.7pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Knowledge</span></p>
+
+<p class=MsoNormal align=center style='margin-top:0cm;margin-right:21.8pt;
+margin-bottom:0cm;margin-left:92.35pt;text-align:center;text-indent:-.5pt;
+line-height:151%'><span style='position:relative;z-index:-1895819264'><span
+style='left:0px;position:absolute;left:5px;top:-2112px;width:439px;height:184px'><img
+width=439 height=184 src="llada2.1.fld/image013.jpg"></span></span><span
+lang=EN-US style='font-size:9.0pt;line-height:151%'>TriviaQA                   72.55          4.30            72.45          4.28            53.33          3.21            53.41          3.14
+bbh-zh                   82.55          5.78            83.21          4.85              67.65          3.89            67.94          3.41</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:19.7pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Reasoning</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.6pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                    </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>ZebraLogic                        84.20      5.80          88.20     5.03          68.50     5.38          70.00      4.62</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                    </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>LiveCodeBench               44.05      6.48          46.48     5.62          28.85     6.42          29.74      5.44</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                     </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>CRUXEval-O                     85.25      6.54          87.00     5.62          70.62     5.85          70.62      5.02</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:19.7pt;text-align:left;text-indent:-.5pt;
+line-height:110%'><span lang=EN-US style='font-size:9.0pt;line-height:110%'>Coding</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:.15pt;margin-left:0cm;text-align:left;text-indent:0cm;line-height:
+110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                     </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>BigCodeBench-Full         37.11      8.51          39.30     7.00          30.18     7.33          30.70      6.05</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>                                    </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Spider                                79.18      8.74          80.58     8.33          75.78     7.98          76.67      7.59</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.65pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>       </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Math                                  AIME
+2025                        63.33      5.36          70.00     4.71          36.67     6.34          36.67      5.25</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:4.45pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>        </span><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Agent &amp; Alignment         IFEval-strict-prompt       83.36      2.24          83.55     2.11          81.33     1.83          83.55      1.70</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:23.9pt;margin-left:0cm;text-align:left;text-indent:0cm;
+line-height:110%'><span lang=EN-US style='font-size:11.0pt;line-height:110%'>       </span><b><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>Average                            </span></b><span
+lang=EN-US style='font-size:9.0pt;line-height:110%'>–                                           70.69      5.82          72.67     5.14          57.63     5.25          58.24      4.59</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:.45pt;
+margin-left:.85pt'><span lang=EN-US>domains. It is necessary to adjust
+threshold parameters for different domains to balance speed and accuracy. In
+structured-data fields such as code and math, setting <i>S Mode </i>achieves
+high speed with little accuracy loss. However, in some general chat cases,
+these settings can cause undesirable output. In such cases,</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:7.6pt;
+margin-left:.85pt'><span lang=EN-US>we recommend adjusting the parameters to <i>Q
+Mode</i>. Our conjecture is that this pattern may be related to the model’s
+inherent preference for structured data or the distributional characteristics
+of training dataset. Further validation will be conducted in our future
+research.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:7.65pt;
+margin-left:.85pt'><b><span lang=EN-US>Editable Enhanced dLLM </span></b><span
+lang=EN-US>Although dLLMs inherently support high parallelism, theoretically
+offering speed advantages over AR models, our experimental observations show
+that this high parallelism also introduces a higher error rate compared to AR
+models. These hidden errors can reduce the model’s confidence in subsequent
+reasoning, ultimately slowing down the overall process. Therefore, timely
+editing to correct errors is essential. In our case analysis of LLaDA2.1, we
+observed that prompt editing corrected decoding errors, helping to maintain
+higher inference speeds. However, research on the editing capabilities of dLLMs
+is still in its early stages. We anticipate that future work, such as
+integrating editing into reinforcement learning, will further enhance the
+performance of editable dLLMs.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:8.7pt;
+margin-left:.85pt'><b><span lang=EN-US>LLaDA2.1 remains in an experimental
+phase. Although rare, certain edge cases may occur. </span></b><span
+lang=EN-US>Empirical observations show that aggressively lowering the masking
+threshold <i>τ</i><sub>mask </sub>can quickly generate “rough drafts”. Although
+the model’s self-correction can partially alleviate the “stuttering” artifacts
+(such as n-gram repetitions) caused by independent parallel sampling, balancing
+drafting speed with the quality of the initial structure remains a key
+operational frontier. Overall, by unifying dynamic inference, hybrid training,
+and principled reinforcement learning, our work establishes a solid foundation
+for self-correcting discrete diffusion language models.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:11.9pt;
+margin-left:.85pt'><b><span lang=EN-US>Conclusion </span></b><span lang=EN-US>Overall,
+LLaDA2.1 introduces an editing feature, which, through cumulative error
+correction, significantly lowered the decoding threshold of the dLLM and
+yielded considerable inference speed benefits. However, this model still faces
+many unresolved issues, and we anticipate that more powerful editable dLLMs
+will deliver even more unexpected and impressive results.</span></p>
+
+<h1 style='margin-top:0cm;margin-right:0cm;margin-bottom:2.35pt;margin-left:
+1.25pt;text-indent:0cm'><span lang=EN-US>References</span></h1>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:6.1pt;margin-left:9.85pt;text-align:left;text-indent:-10.2pt;
+line-height:107%'><span lang=EN-US>AIME.        AIME Problems and Solutions,
+2025.       URL <a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>https://artofproblemsolving.com/wiki/index.php/
+</span></a><a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>AIME</span></a></span><span
+lang=EN-US style='font-family:Inconsolata;color:#00007F'> </span><span
+lang=EN-US style='font-size:11.0pt;line-height:107%'><img border=0 width=4
+height=1 id="Group 32615" src="llada2.1.fld/image014.jpg"></span><span
+lang=EN-US><a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>Problems</span></a></span><span
+lang=EN-US style='font-family:Inconsolata;color:#00007F'> </span><span
+lang=EN-US style='font-size:11.0pt;line-height:107%'><img border=0 width=4
+height=1 id="Group 32618" src="llada2.1.fld/image014.jpg"></span><span
+lang=EN-US><a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>and</span></a></span><span
+lang=EN-US style='font-family:Inconsolata;color:#00007F'> </span><span
+lang=EN-US><a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>Solutions</span></a><a
+href="https://artofproblemsolving.com/wiki/index.php/AIME_Problems_and_Solutions"><span
+style='color:black;text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:6.1pt;margin-left:9.85pt;text-align:left;text-indent:-10.2pt;
+line-height:107%'><span lang=EN-US>Aleph-Alpha. Alpha-MoE: A megakernel for
+faster tensor parallel inference. URL <a
+href="https://aleph-alpha.com/alpha-moe-a-megakernel-for-faster-tensor-parallel-inference/"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>https://aleph-alpha.
+</span></a><a
+href="https://aleph-alpha.com/alpha-moe-a-megakernel-for-faster-tensor-parallel-inference/"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>com/alpha-moe-a-megakernel-for-faster-tensor-parallel-inference/</span></a><a
+href="https://aleph-alpha.com/alpha-moe-a-megakernel-for-faster-tensor-parallel-inference/"><span
+style='color:black;text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:0cm;
+margin-left:10.7pt;text-indent:-9.95pt;line-height:157%'><span lang=EN-US>Ant
+Group Team and SGLang Team. Power Up Diffusion LLMs: Day-0 Support for LLaDA
+2.0 </span><span lang=EN-US style='font-family:"Cambria",serif'>| </span><span
+lang=EN-US>LMSYS Org. URL <a
+href="https://lmsys.org/blog/2025-12-19-diffusion-llm"><span style='font-family:
+Inconsolata;color:#00007F;text-decoration:none'>https://lmsys.org/blog/2025-12-19-diffusion-llm</span></a><a
+href="https://lmsys.org/blog/2025-12-19-diffusion-llm"><span style='color:black;
+text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Marianne Arriola,
+Aaron Gokaslan, Justin T Chiu, Zhihan Yang, Zhixuan Qi, Jiaqi Han, Subham
+Sekhar Sahoo, and Volodymyr Kuleshov. Block diffusion: Interpolating between
+autoregressive and diffusion language models. <i>arXiv preprint
+arXiv:2503.09573</i>, 2025.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.7pt;text-align:left;text-indent:-9.95pt;
+line-height:93%'><span lang=EN-US>Tiwei Bie, Maosong Cao, Kun Chen, Lun Du,
+Mingliang Gong, Zhuochen Gong, Yanmei Gu, Jiaqi Hu, Zenan Huang, Zhenzhong Lan,
+Chengxi Li, Chongxuan Li, Jianguo Li, Zehuan Li, Huabin Liu, Ling Liu, Guoshan
+Lu, Xiaocheng Lu, Yuxin Ma, Jianfeng Tan, Lanning Wei, Ji-Rong Wen, Yipeng
+Xing, Xiaolu Zhang, Junbo Zhao, Da Zheng, Jun Zhou, Junlin Zhou, Zhanchao Zhou,
+Liwang Zhu, and Yihong Zhuang. LLaDA2.0: Scaling Up Diffusion Language Models
+to 100B, December 2025.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.7pt;text-align:left;text-indent:-9.95pt;
+line-height:93%'><span lang=EN-US>Yonatan Bisk, Rowan Zellers, Jianfeng Gao,
+Yejin Choi, et al. Piqa: Reasoning about physical commonsense in natural
+language. In <i>Proceedings of the AAAI conference on artificial intelligence</i>,
+volume 34, pp. 7432–7439, 2020.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Federico Cassano, John Gouwar, Daniel
+Nguyen, Sydney Nguyen, Luna Phipps-Costin, Donald Pinckney,</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.6pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Ming-Ho Yee, Yangtian Zi, Carolyn Jane
+Anderson, Molly Q Feldman, et al. MultiPL-E: A Scalable and Polyglot Approach
+to Benchmarking Neural Code Generation. <i>IEEE Transactions on Software
+Engineering</i>, 49(7):3675–3691, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.3pt;text-indent:-9.55pt'><span lang=EN-US>Dheeru Dua, Yizhong
+Wang, Pradeep Dasigi, Gabriel Stanovsky, Sameer Singh, and Matt Gardner. DROP:
+A Reading Comprehension Benchmark Requiring Discrete Reasoning over Paragraphs.
+<i>arXiv preprint arXiv:1903.00161</i>, 2019.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Wei Fu, Jiaxuan Gao, Xujie Shen, Chen Zhu,
+Zhiyu Mei, Chuyi He, Shusheng Xu, Guo Wei, Jun Mei, Jiashu</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.0pt'><span lang=EN-US>Wang, Tongkai Yang, Binhang Yuan, and Yi
+Wu. Areal: A large-scale asynchronous reinforcement learning system for
+language reasoning, 2025. URL <a href="https://arxiv.org/abs/2505.24298"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>https://arxiv.org/abs/2505.24298</span></a><a
+href="https://arxiv.org/abs/2505.24298"><span style='color:black;text-decoration:
+none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Bofei Gao, Feifan
+Song, Zhe Yang, Zefan Cai, Yibo Miao, Qingxiu Dong, Lei Li, Chenghao Ma, Liang
+Chen, Runxin Xu, et al. Omni-math: A universal olympiad level mathematic
+benchmark for large language models. <i>arXiv preprint arXiv:2410.07985</i>,
+2024.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.7pt;text-align:left;text-indent:-9.95pt;
+line-height:93%'><span lang=EN-US>Alex Gu, Baptiste Roziere, Hugh Leather,
+Armando Solar-Lezama, Gabriel Synnaeve, and Sida I Wang. Crux-` Eval: A
+Benchmark for Code Reasoning, Understanding and Execution. <i>arXiv preprint
+arXiv:2401.03065</i>, 2024.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.4pt;text-indent:-9.65pt'><span lang=EN-US>Chaoqun He, Renjie
+Luo, Yuzhuo Bai, Shengding Hu, Zhen Leng Thai, Junhao Shen, Jinyi Hu, Xu Han,
+Yujie Huang, Yuxiang Zhang, et al. OlympiadBench: A Challenging Benchmark for
+Promoting AGI with Olympiad-Level Bilingual Multimodal Scientific Problems. <i>arXiv
+preprint arXiv:2402.14008</i>, 2024.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Hai Hu, Kyle
+Richardson, Liang Xu, Lu Li, Sandra Kubler, and Lawrence S Moss. Ocnli:
+Original chinese¨ natural language inference. <i>arXiv preprint
+arXiv:2010.05444</i>, 2020.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:6.75pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Yuzhen Huang, Yuzhuo
+Bai, Zhihao Zhu, Junlei Zhang, Jinghan Zhang, Tangjun Su, Junteng Liu,
+Chuancheng Lv, Yikai Zhang, Yao Fu, et al. C-Eval: A Multi-Level
+Multi-Discipline Chinese Evaluation Suite for Foundation Models. <i>Advances in
+Neural Information Processing Systems</i>, 36:62991–63010, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>InclusionAI. dFactory:
+Easy and Efficient dLLM Fine-Tuning, 2025. URL <a
+href="https://github.com/inclusionAI/dFactory"><span style='font-family:Inconsolata;
+color:#00007F;text-decoration:none'>https://github.com/inclusionAI/ </span></a><a
+href="https://github.com/inclusionAI/dFactory"><span style='font-family:Inconsolata;
+color:#00007F;text-decoration:none'>dFactory</span></a><a
+href="https://github.com/inclusionAI/dFactory"><span style='color:black;
+text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Naman Jain, King Han,
+Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida Wang, Armando
+SolarLezama, Koushik Sen, and Ion Stoica. Livecodebench: Holistic and
+contamination free evaluation of large language models for code. <i>arXiv
+preprint arXiv:2403.07974</i>, 2024.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Mandar Joshi, Eunsol
+Choi, Daniel S Weld, and Luke Zettlemoyer. Triviaqa: A large scale distantly
+supervised challenge dataset for reading comprehension. <i>arXiv preprint
+arXiv:1705.03551</i>, 2017.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.4pt;text-indent:-9.65pt'><span lang=EN-US>Wonjun Kang, Kevin
+Galim, Seunghyuk Oh, Minjae Lee, Yuchen Zeng, Shuibai Zhang, Coleman Hooper,
+Yuezhou Hu, Hyung Il Koo, Nam Ik Cho, and Kangwook Lee. ParallelBench:
+Understanding the Tradeoffs of Parallel Decoding in Diffusion LLMs, October
+2025. URL <a href="http://arxiv.org/abs/2510.04767"><span style='font-family:
+Inconsolata;color:#00007F;text-decoration:none'>http://arxiv.org/abs/2510.04767</span></a><a
+href="http://arxiv.org/abs/2510.04767"><span style='color:black;text-decoration:
+none'>. </span></a>arXiv:2510.04767 [cs].</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Mehran Kazemi, Bahare Fatemi, Hritik
+Bansal, John Palowitch, Chrysovalantis Anastasiou, Sanket Vaibhav</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.25pt;text-align:left;text-indent:-.2pt;
+line-height:93%'><span lang=EN-US>Mehta, Lalit K Jain, Virginia Aglietti, Disha
+Jindal, Yuanzhu Peter Chen, et al. Big-bench extra hard. In <i>Proceedings of
+the 63rd Annual Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers)</i>, pp. 26473–26501, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Sanghyun Lee, Sunwoo
+Kim, Seungryong Kim, Jongho Park, and Dongmin Park. Effective Test-Time Scaling
+of Discrete Diffusion through Iterative Refinement, November 2025. URL <a
+href="http://arxiv.org/abs/2511.05562"><span style='font-family:Inconsolata;
+color:#00007F;text-decoration:none'>http://arxiv.org/abs/2511. </span></a><a
+href="http://arxiv.org/abs/2511.05562"><span style='font-family:Inconsolata;
+color:#00007F;text-decoration:none'>05562</span></a><a
+href="http://arxiv.org/abs/2511.05562"><span style='color:black;text-decoration:
+none'>.</span></a> arXiv:2511.05562 [cs].</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Jinyang Li, Binyuan
+Hui, Ge Qu, Jiaxi Yang, Binhua Li, Bowen Li, Bailin Wang, Bowen Qin, Ruiying
+Geng, Nan Huo, et al. Can llm already serve as a database interface? a big
+bench for large-scale database grounded text-to-sqls. <i>Advances in Neural
+Information Processing Systems</i>, 36:42330–42357, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Qintong Li, Leyang
+Cui, Xueliang Zhao, Lingpeng Kong, and Wei Bi. Gsm-plus: A comprehensive
+benchmark for evaluating the robustness of llms as mathematical problem
+solvers. <i>arXiv preprint arXiv:2402.19255</i>, 2024.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.4pt;text-align:left;text-indent:-9.65pt;
+line-height:93%'><span lang=EN-US>Bill Yuchen Lin, Ronan Le Bras, Kyle
+Richardson, Ashish Sabharwal, Radha Poovendran, Peter Clark, and Yejin Choi.
+Zebralogic: On the scaling limits of llms for logical reasoning. <i>arXiv
+preprint arXiv:2502.01100</i>, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Ling Team et al. Every
+step evolves: Scaling reinforcement learning for trillion-scale thinking model,
+2025. URL <a href="https://arxiv.org/abs/2510.18855"><span style='font-family:
+Inconsolata;color:#00007F;text-decoration:none'>https://arxiv.org/abs/2510.18855</span></a><a
+href="https://arxiv.org/abs/2510.18855"><span style='color:black;text-decoration:
+none'>.</span></a></span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.4pt;text-align:left;text-indent:-9.65pt;
+line-height:93%'><span lang=EN-US>Jiawei Liu, Chunqiu Steven Xia, Yuyao Wang,
+and Lingming Zhang. Is your code generated by chatgpt really correct? rigorous
+evaluation of large language models for code generation. <i>Advances in Neural
+Information Processing Systems</i>, 36:21558–21572, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Kaijing Ma, Xinrun Du,
+Yunran Wang, Haoran Zhang, Zhoufutu Wen, Xingwei Qu, Jian Yang, Jiaheng Liu,
+Minghao Liu, Xiang Yue, et al. Kor-bench: Benchmarking language models on
+knowledge-orthogonal reasoning tasks. <i>arXiv preprint arXiv:2410.06526</i>,
+2024.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.4pt;text-align:left;text-indent:-9.65pt;
+line-height:93%'><span lang=EN-US>Yuxin Ma, Lun Du, Lanning Wei, Kun Chen, Qian
+Xu, Kangyu Wang, Guofeng Feng, Guoshan Lu, Lin Liu, Xiaojing Qi, et al. dinfer:
+An efficient inference framework for diffusion language models. <i>arXiv
+preprint arXiv:2510.08666</i>, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.45pt;text-indent:-9.7pt'><span lang=EN-US>Zhiyu Mei, Wei Fu,
+Kaiwei Li, Guangju Wang, Huanchen Zhang, and Yi Wu. Real: Efficient rlhf
+training of large language models with parameter reallocation. In <i>Proceedings
+of the Eighth Conference on Machine Learning and Systems, MLSys 2025, Santa
+Clara, CA, USA, May 12-15, 2025</i>. mlsys.org, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Nexusflow.ai Team. Nexusraven-v2:
+Surpassing gpt-4 for zero-shot function calling, 2023. URL <a
+href="https://nexusflow.ai/blogs/ravenv2"><span style='font-family:Inconsolata;
+color:#00007F;text-decoration:none'>https:</span></a></span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:6.1pt;margin-left:9.9pt;text-align:left;text-indent:0cm;
+line-height:107%'><span lang=EN-US><a href="https://nexusflow.ai/blogs/ravenv2"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>//nexusflow.ai/blogs/ravenv2</span></a><a
+href="https://nexusflow.ai/blogs/ravenv2"><span style='color:black;text-decoration:
+none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Opencompass Team.                  open-compass/opencompass,
+2023.       URL <a href="https://github.com/open-compass/opencompass"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>https://github.com/open-compass/
+</span></a><a href="https://github.com/open-compass/opencompass"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>opencompass</span></a><a
+href="https://github.com/open-compass/opencompass"><span style='color:black;
+text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Jingyang Ou, Jiaqi
+Han, Minkai Xu, Shaoxuan Xu, Jianwen Xie, Stefano Ermon, Yi Wu, and Chongxuan
+Li. Principled RL for Diffusion LLMs Emerges from a Sequence-Level Perspective,
+December 2025. URL <a href="http://arxiv.org/abs/2512.03759"><span
+style='font-family:Inconsolata;color:#00007F;text-decoration:none'>http://arxiv.org/abs/2512.03759</span></a><a
+href="http://arxiv.org/abs/2512.03759"><span style='color:black;text-decoration:
+none'>.</span></a> arXiv:2512.03759 [cs].</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Shishir G. Patil,
+Huanzhi Mao, Charlie Cheng-Jie Ji, Fanjia Yan, Vishnu Suresh, Ion Stoica, and
+Joseph E. Gonzalez. The berkeley function calling leaderboard (bfcl): From tool
+use to agentic evaluation of large language models. In <i>Forty-second
+International Conference on Machine Learning</i>, 2025.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.7pt;text-align:left;text-indent:-9.95pt;
+line-height:93%'><span lang=EN-US>Shi Qiu, Shaoyang Guo, Zhuo-Yang Song, Yunbo
+Sun, Zeyu Cai, Jiashen Wei, Tianyu Luo, Yixuan Yin, Haoxu Zhang, Yi Hu, et al.
+Phybench: Holistic evaluation of physical perception and reasoning in large
+language models. <i>arXiv preprint arXiv:2504.16074</i>, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Pranav Rajpurkar,
+Robin Jia, and Percy Liang. Know what you don’t know: Unanswerable questions
+for squad. <i>arXiv preprint arXiv:1806.03822</i>, 2018.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>David Rein, Betty Li Hou, Asa Cooper
+Stickland, Jackson Petty, Richard Yuanzhe Pang, Julien Dirani, Julian</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:6.75pt;
+margin-left:10.15pt'><span lang=EN-US>Michael, and Samuel R Bowman. GPQA: A
+Graduate-Level Google-Proof Q&amp;Q Benchmark. In <i>First Conference on
+Language Modeling</i>, 2024.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Dimitri von Rutte,
+Janis Fluri, Yuhui Ding, Antonio Orvieto, Bernhard Sch¨             olkopf, et
+al. Generalized Interpo-¨ lating Discrete Diffusion. June 2025. URL <a
+href="https://openreview.net/forum?id=rvZv7sDPV9"><span style='font-family:
+Inconsolata;color:#00007F;text-decoration:none'>https://openreview.net/forum?id=rvZv7sDPV9</span></a><a
+href="https://openreview.net/forum?id=rvZv7sDPV9"><span style='color:black;
+text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Abulhair Saparov and
+He He. Language models are greedy reasoners: A systematic formal analysis of
+chain-of-thought. <i>arXiv preprint arXiv:2210.01240</i>, 2022.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Yuxuan Song, Zheng
+Zhang, Cheng Luo, Pengyang Gao, Fan Xia, Hao Luo, Zheng Li, Yuehang Yang, et
+al. Seed diffusion: A large-scale diffusion language model with high-speed
+inference, 2025.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Zayne Sprague, Xi Ye,
+Kaj Bostrom, Swarat Chaudhuri, and Greg Durrett. Musr: Testing the limits of
+chain-of-thought with multistep soft reasoning. <i>arXiv preprint
+arXiv:2310.16049</i>, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Mirac Suzgun, Nathan Scales, Nathanael
+Scharli, Sebastian Gehrmann, Yi Tay, Hyung Won Chung, et al.¨</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.15pt'><span lang=EN-US>Challenging big-bench tasks and whether
+chain-of-thought can solve them. In <i>Findings of the Association for
+Computational Linguistics: ACL 2023</i>, pp. 13003–13051, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Chenyu Wang, Paria
+Rashidinejad, DiJia Su, Song Jiang, Sid Wang, Siyan Zhao, Cai Zhou, Shannon
+Zejiang Shen, Feiyu Chen, Tommi Jaakkola, Yuandong Tian, and Bo Liu. Spg:
+Sandwiched policy gradient for masked diffusion language models. <i>arXiv
+preprint arXiv:2510.09541</i>, 2025a.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Guanghan Wang, Yair
+Schiff, Subham Sekhar Sahoo, and Volodymyr Kuleshov. Remasking Discrete
+Diffusion Models with Inference-Time Scaling. October 2025b. URL <a
+href="https://openreview.net/forum?id=IJryQAOy0p"><span style='font-family:
+Inconsolata;color:#00007F;text-decoration:none'>https://openreview.net/forum?id=IJryQAOy0p</span></a><a
+href="https://openreview.net/forum?id=IJryQAOy0p"><span style='color:black;
+text-decoration:none'>.</span></a></span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Yinjie Wang, Ling
+Yang, Bowen Li, Ye Tian, Ke Shen, and Mengdi Wang. Revolutionizing
+reinforcement learning framework for diffusion large language models. <i>arXiv
+preprint arXiv:2509.06949</i>, 2025c.</span></p>
+
+<p class=MsoNormal align=left style='margin-top:0cm;margin-right:0cm;
+margin-bottom:5.75pt;margin-left:10.7pt;text-align:left;text-indent:-9.95pt;
+line-height:93%'><span lang=EN-US>Yubo Wang, Xueguang Ma, Ge Zhang, Yuansheng
+Ni, Abhranil Chandra, et al. MMLU-Pro: A More Robust and Challenging Multi-Task
+Language Understanding Benchmark. In <i>The Thirty-eight Conference on Neural
+Information Processing Systems Datasets and Benchmarks Track</i>, 2024.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Tianwen Wei, Jian
+Luan, Wei Liu, Shuang Dong, and Bin Wang. Cmath: Can your language model pass
+chinese elementary school math test? <i>arXiv preprint arXiv:2306.16636</i>,
+2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Tao Yu, Rui Zhang, Kai Yang, Michihiro
+Yasunaga, Dongxu Wang, Zifan Li, James Ma, Irene Li, Qingning</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.15pt'><span lang=EN-US>Yao, Shanelle Roman, et al. Spider: A
+large-scale human-labeled dataset for complex and cross-domain semantic parsing
+and text-to-sql task. <i>arXiv preprint arXiv:1809.08887</i>, 2018.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Rowan Zellers, Ari
+Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi. Hellaswag: Can a machine
+really finish your sentence? <i>arXiv preprint arXiv:1905.07830</i>, 2019.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.7pt;text-indent:-9.95pt'><span lang=EN-US>Jeffrey Zhou, Tianjian
+Lu, Swaroop Mishra, Siddhartha Brahma, et al. Instruction-Following Evaluation
+for Large Language Models. <i>arXiv preprint arXiv:2311.07911</i>, 2023.</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:1.35pt;
+margin-left:.85pt'><span lang=EN-US>Terry Yue Zhuo, Minh Chien Vu, Jenny Chim,
+Han Hu, Wenhao Yu, Ratnadira Widyasari, Imam Nur Bani</span></p>
+
+<p class=MsoNormal style='margin-top:0cm;margin-right:1.5pt;margin-bottom:5.65pt;
+margin-left:10.15pt'><span lang=EN-US>Yusuf, Haolan Zhan, Junda He, Indraneil
+Paul, et al. Bigcodebench: Benchmarking code generation with diverse function
+calls and complex instructions. <i>arXiv preprint arXiv:2406.15877</i>, 2024.</span></p>
+
+</div>
+
+</body>
+
+</html>
